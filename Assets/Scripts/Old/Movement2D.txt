@@ -1,0 +1,67 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Movement2D : MonoBehaviour
+{
+    RectTransform rectTransform;
+    float speed;
+    Vector2 aPosInit;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        rectTransform = GetComponent<RectTransform>();
+
+        aPosInit = transform.position;
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        Vector2 aPos = transform.position;
+        speed = 1.2f;
+
+        aPos.y -= 0.81f;
+        transform.position = aPos;
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            Debug.Log("Sprint");
+            speed = 2.4f;
+        }
+        
+        if(Input.GetKey(KeyCode.W))
+        {
+            Debug.Log("W");
+            aPos.y += speed*1f;
+            transform.position = aPos;
+        }
+
+        if(Input.GetKey(KeyCode.A))
+        {
+            Debug.Log ("A");
+            aPos.x -= (speed/2)*1f;
+            transform.position = aPos;
+        }
+
+        if (Input.GetKey(KeyCode.D))
+        {
+            Debug.Log("D");
+            aPos.x += (speed / 2) * 1f;
+            transform.position = aPos;
+        }
+
+        if (Input.GetKey(KeyCode.S))
+        {
+            Debug.Log("S");
+            aPos.y -= (speed / 2) * 1f;
+            transform.position = aPos;
+        }
+
+        if (Input.GetKeyDown(KeyCode.R)) 
+        { 
+            transform.position = aPosInit;
+        }
+        Debug.Log(speed);
+    }
+}

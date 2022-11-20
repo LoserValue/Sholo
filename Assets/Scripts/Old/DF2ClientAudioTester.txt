@@ -1,0 +1,196 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using Newtonsoft.Json;
+using Syrus.Plugins.DFV2Client;
+using UnityEngine.UI;
+using System.Collections;
+
+public class DF2ClientAudioTester : MonoBehaviour
+{
+	public InputField session, content;
+
+	public Text chatbotText;
+
+	private DialogFlowV2Client client;
+
+	public AudioClip testClip;
+
+	public AudioSource audioPlayer;
+
+
+	private string languageCode = "it-IT";
+
+
+	// Start is called before the first frame update
+	void Start()
+	{
+		client = GetComponent<DialogFlowV2Client>();
+
+		audioPlayer = GetComponent<AudioSource>();
+
+		// Adjustes session name if it is blank.
+		string sessionName = GetSessionName();
+
+		client.ChatbotResponded += LogResponseText;
+		client.DetectIntentError += LogError;
+		client.ReactToContext("DefaultWelcomeIntent-followup",
+			context => Debug.Log("Reacting to welcome followup"));
+		client.SessionCleared += sess => Debug.Log("Cleared session " + session);
+		client.AddInputContext(new DF2Context("userdata", 1, ("name", "George")), sessionName);
+
+		Dictionary<string, object> parameters = new Dictionary<string, object>()
+		{
+			{ "last-name", "albero" }
+		};
+
+		//client.DetectIntentFromEvent("Muovi ", parameters, sessionName);
+		StartCoroutine(StartRoutinRecord());
+    }
+	private void Update()
+	{
+		if (Input.GetKeyDown(KeyCode.F1))
+		{
+			byte[] audioBytes = WavUtility.FromAudioClip(testClip);
+			string audioString = Convert.ToBase64String(audioBytes);
+			SendAudio(audioString);
+		}
+    }
+
+	private void LogResponseText(DF2Response response)
+	{
+
+
+		Debug.Log(JsonConvert.SerializeObject(response, Formatting.Indented));
+		Debug.Log(GetSessionName() + " said: \"" + response.queryResult.fulfillmentText + "\"");
+		Debug.Log("Audio " + response.OutputAudio);
+
+		chatbotText.text = response.queryResult.queryText + "\n";
+
+		chatbotText.text += response.queryResult.fulfillmentText;
+
+
+		byte[] audioBytes = Convert.FromBase64String(response.OutputAudio);
+		AudioClip clip = WavUtility.ToAudioClip(audioBytes);
+
+		audioPlayer.clip = clip;
+		audioPlayer.Play();
+
+
+	}
+
+	private void LogError(DF2ErrorResponse errorResponse)
+	{
+		Debug.LogError(string.Format("Error {0}: {1}", errorResponse.error.code.ToString(),
+			errorResponse.error.message));
+	}
+
+	//@hoatong
+	public void SendAudio(string audioString)
+	{
+		string sessionName = GetSessionName();
+		client.DetectIntentFromAudio(audioString, sessionName, languageCode);
+	}
+
+
+	public void SendText()
+	{
+		// DF2Entity name0 = new DF2Entity("George", "George");
+		// DF2Entity name1 = new DF2Entity("Greg", "Greg");
+		// DF2Entity potion = new DF2Entity("Potion", "Potion", "Cure", "Healing potion");
+		// DF2Entity antidote = new DF2Entity("Antidote", "Antidote", "Poison cure");
+		// DF2EntityType names = new DF2EntityType("names", DF2EntityType.DF2EntityOverrideMode.ENTITY_OVERRIDE_MODE_SUPPLEMENT,
+		// 	new DF2Entity[] { name0, name1 });
+		// DF2EntityType items = new DF2EntityType("items", DF2EntityType.DF2EntityOverrideMode.ENTITY_OVERRIDE_MODE_SUPPLEMENT,
+		// 	new DF2Entity[] { potion, antidote });
+
+		string sessionName = GetSessionName();
+		//client.AddEntityType(names, sessionName);
+		//client.AddEntityType(items, sessionName);
+
+		client.DetectIntentFromText(content.text, sessionName, languageCode);
+
+	}
+
+
+	public void SendEvent()
+	{
+		client.DetectIntentFromEvent(content.text,
+			new Dictionary<string, object>(), GetSessionName());
+	}
+
+	public void Clear()
+	{
+		client.ClearSession(GetSessionName());
+	}
+
+
+	private string GetSessionName(string defaultFallback = "DefaultSession")
+	{
+		string sessionName = session.text;
+		if (sessionName.Trim().Length == 0)
+			sessionName = defaultFallback;
+		return sessionName;
+	}
+
+	#region AUDIO RECORD
+
+	AudioClip recordedAudioClip;
+
+	//Keep this one as a global variable (outside the functions) too and use GetComponent during start to save resources
+	//AudioSource audioSource;
+
+	private float startRecordingTime;
+
+
+	IEnumerator StartRoutinRecord()
+	{
+		while (true)
+		{
+			Debug.Log("Funziona");
+			StartRecord();
+			yield return new WaitForSeconds(2);
+			AudioClip recorded = StopRecord();
+			byte[] audioBytes = WavUtility.FromAudioClip(recorded);
+			string audioString = Convert.ToBase64String(audioBytes);
+			SendAudio(audioString);
+		}
+	}
+
+	public AudioClip StopRecord()
+	{
+		//End the recording when the mouse comes back up, then play it
+		Microphone.End("");
+
+		//Trim the audioclip by the length of the recording
+		AudioClip recordingNew = AudioClip.Create(recordedAudioClip.name,
+			(int)((Time.time - startRecordingTime) * recordedAudioClip.frequency), recordedAudioClip.channels,
+			recordedAudioClip.frequency, false);
+		float[] data = new float[(int)((Time.time - startRecordingTime) * recordedAudioClip.frequency)];
+		recordedAudioClip.GetData(data, 0);
+		recordingNew.SetData(data, 0);
+		this.recordedAudioClip = recordingNew;
+
+		return recordedAudioClip;
+		//Play recording
+		//audioSource.clip = recordedAudioClip;
+		//audioSource.Play();
+	}
+
+	public void StartRecord()
+	{
+		//Get the max frequency of a microphone, if it's less than 44100 record at the max frequency, else record at 44100
+		int minFreq;
+		int maxFreq;
+		int freq = 44100;
+		Microphone.GetDeviceCaps("", out minFreq, out maxFreq);
+		if (maxFreq < 44100)
+			freq = maxFreq;
+
+		//Start the recording, the length of 300 gives it a cap of 5 minutes
+		recordedAudioClip = Microphone.Start("", false, 2, 44100);
+		startRecordingTime = Time.time;
+	}
+
+	#endregion
+}
