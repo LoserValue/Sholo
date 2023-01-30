@@ -167,12 +167,12 @@ public class DF2Manager : MonoBehaviour
 		{
 			await Task.Yield();
 		}
-		resultCamObject = nodeRed.responseReceived;
-		if (resultCamObject.Contains("gun") || resultCamObject.Contains("Revolver"))
+		resultCamObject = nodeRed.responseReceived.ToLower();
+		if ((resultCamObject.Contains("gun") || resultCamObject.Contains("revolver")) || resultCamObject.Contains("weapon"))
         {
 			isScared = true;
         }
-		if(resultCamObject.Contains("Flower") || resultCamObject.Contains("Plant"))
+		if(resultCamObject.Contains("flower") || resultCamObject.Contains("plant"))
         {
 			isClapping = true;
         }
